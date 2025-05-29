@@ -1,4 +1,5 @@
 const CACHE_NAME = 'kuliner-nusantara-v1';
+const DYNAMIC_CACHE_NAME = 'kuliner-nusantara-dynamic-v1';
 const ASSETS_TO_CACHE = [
   '/starter-project-with-webpack/',
   '/starter-project-with-webpack/index.html',
@@ -27,11 +28,24 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
-  );
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(
+      caches.open(DYNAMIC_CACHE_NAME).then((cache) => {
+        return fetch(event.request)
+          .then((response) => {
+            cache.put(event.request.url, response.clone());
+            return response;
+          })
+          .catch(() => caches.match(event.request));
+      })
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((response) => {
+        return response || fetch(event.request);
+      })
+    );
+  }
 });
 
 self.addEventListener('push', function(event) {
