@@ -1,11 +1,11 @@
 const CACHE_NAME = 'kuliner-nusantara-v1';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/styles/styles.css',
-  '/scripts/index.js',
-  '/public/images/logo.png',
-  '/public/favicon.png',
+  '/starter-project-with-webpack/',
+  '/starter-project-with-webpack/index.html',
+  '/starter-project-with-webpack/styles/styles.css',
+  '/starter-project-with-webpack/scripts/index.js',
+  '/starter-project-with-webpack/images/logo.png',
+  '/starter-project-with-webpack/favicon.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
