@@ -50,12 +50,12 @@ export default class HomePage {
         }
         // Hapus story offline
         if (isOffline) {
-          document.querySelectorAll('.delete-story-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-              const id = btn.getAttribute('data-id');
-              await deleteStory(id);
-              const newStories = await getAllStories();
-              presenter.view.showStories(newStories);
+          document.querySelectorAll('.delete-story-btn').forEach(button => {
+            button.addEventListener('click', async (event) => {
+              const storyId = event.target.dataset.id;
+              await deleteStory(storyId);
+              alert('Data berhasil dihapus!');
+              this.afterRender();
             });
           });
         }

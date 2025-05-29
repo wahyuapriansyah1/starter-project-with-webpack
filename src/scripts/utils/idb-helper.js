@@ -50,3 +50,14 @@ export async function deleteStory(id) {
     request.onerror = () => reject(request.error);
   });
 }
+
+export async function saveStory(story) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.put(story);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
