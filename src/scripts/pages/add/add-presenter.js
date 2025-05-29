@@ -1,5 +1,6 @@
 import { addStory } from '../../data/api';
 import { showLocalNotification, requestNotificationPermission, subscribeUserToPush } from '../../utils/push-notification';
+import { saveStory } from '../../utils/idb-helper';
 
 class AddPresenter {
   constructor({ showToast, redirectHome }) {
@@ -42,7 +43,8 @@ class AddPresenter {
         setTimeout(() => { this.redirectHome(); }, 1200);
       }
     } catch (err) {
-      this.showToast('Terjadi kesalahan jaringan.');
+      this.showToast('Terjadi kesalahan jaringan. Data disimpan secara offline.');
+      await saveStory({ id: Date.now(), name, description, photoUrl: photo, lat, lon: lng });
     }
   }
 }
