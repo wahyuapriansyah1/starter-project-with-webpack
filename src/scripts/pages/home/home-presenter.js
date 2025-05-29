@@ -37,6 +37,15 @@ class HomePresenter {
       }
     }
   }
+
+  async refreshOfflineStories() {
+    const offlineStories = await getAllStories();
+    if (offlineStories.length > 0) {
+      this.view.showStories(offlineStories);
+    } else {
+      this.view.showEmpty();
+    }
+  }
 }
 
 export default HomePresenter;
