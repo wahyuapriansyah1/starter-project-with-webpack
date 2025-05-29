@@ -7,7 +7,8 @@
     <link rel="shortcut icon" href="favicon.png">
     <title>Kuliner Nusantara</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="manifest" href="public/manifest.json">
+    <link rel="manifest" href="/starter-project-with-webpack/public/manifest.json">
+    <meta name="theme-color" content="#2196f3">
   </head>
   <body>
     <a href="#main-content" class="skip-link">Lewati ke konten utama</a>
@@ -39,7 +40,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/service-worker.js');
+          navigator.serviceWorker.register('/starter-project-with-webpack/service-worker.js');
         });
       }
     </script>

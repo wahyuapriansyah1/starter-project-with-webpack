@@ -2,7 +2,7 @@
   "name": "Kuliner Nusantara",
   "short_name": "KulinerID",
   "description": "Platform berbagi dan menemukan cerita kuliner Indonesia.",
-  "start_url": "./index.html",
+  "start_url": "/starter-project-with-webpack/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196f3",
