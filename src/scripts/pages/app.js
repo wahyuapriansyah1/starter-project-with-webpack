@@ -33,6 +33,7 @@ class App {
   }
 
   async renderPage() {
+    console.log('[DEBUG] renderPage dipanggil, hash:', location.hash);
     const url = getActiveRoute();
     let page = routes[url];
     const mainContent = this.#content;
@@ -51,6 +52,7 @@ class App {
     setTimeout(() => {
       mainContent.classList.remove('view-fade');
       mainContent.focus();
+      console.log('[DEBUG] renderPage selesai, konten sudah diupdate');
     }, 10);
   }
 

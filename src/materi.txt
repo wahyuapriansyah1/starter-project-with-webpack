@@ -1,0 +1,833 @@
+Berikut daftar alurnya.
+
+Mendaftarkan service worker script kosong.
+Menyusun kode untuk menampilkan sampel notifikasi.
+Berlangganan push notification pada push manager.
+Menyediakan akses untuk memutus langganan push message.
+Apakah Anda sudah siap? Jika tidak memegang hasil proyek kita yang terakhir, Anda bisa mengunduh dan membuka citycareapp-javascript-background-starter.zip.
+
+
+
+Register Service Worker
+Mula-mula, kita buatkan dahulu berkas sw.js dalam direktori scripts dengan isi berikut.
+
+scripts → sw.js
+ 
+Tidak ada kode apa pun, ya? Memang untuk menginstal service worker, tidak diwajibkan ada kode sedikit pun. Cukup buat berkasnya dan daftarkan dahulu itu tidak mengapa. Nanti kita akan perbarui kodenya sama-sama.
+
+Kemudian, mari daftarkan service worker script ini. Silakan buka berkas utils → index.js dan tambahkan kode bercetak tebal berikut.
+
+utils → index.js
+/* ...kode lainnya disembunyikan... */
+ 
+export function isServiceWorkerAvailable() {
+  return 'serviceWorker' in navigator;
+}
+ 
+export async function registerServiceWorker() {
+  if (!isServiceWorkerAvailable()) {
+    console.log('Service Worker API unsupported');
+    return;
+  }
+ 
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    console.log('Service worker telah terpasang', registration);
+  } catch (error) {
+    console.log('Failed to install service worker:', error);
+  }
+}
+Kira-kira, di mana tempat yang cocok untuk menjalankan utility function di atas? Karena cukup dijalankan sekali dan termasuk core feature aplikasi, kita memiliki satu tempat yang pas, yaitu function handler untuk event DOMContentLoaded. Mari kita lakukan.
+
+Bukalah berkas scripts → index.js dan tambahkan kode bercetak tebal berikut.
+
+// CSS imports
+/* ...kode lainnya disembunyikan... */
+ 
+// Components
+import App from './pages/app';
+import { registerServiceWorker } from './utils';
+ 
+document.addEventListener('DOMContentLoaded', async () => {
+  /* ...kode lainnya disembunyikan... */
+ 
+  await registerServiceWorker();
+ 
+  window.addEventListener('hashchange', async () => {
+    await app.renderPage();
+  });
+});
+Sudah disesuaikan? Mari kita jalankan aplikasinya menggunakan perintah berikut.
+
+npm run start-dev
+Tentu tidak ada perubahan apa pun dalam aplikasi. Kita bisa melihat status service worker dalam Developer Tools. Lo, tetapi sepertinya ada yang aneh, deh.
+
+
+
+Status service worker adalah “trying to install” melulu. Ada apa gerangan? Coba mari kita cek console browser.
+
+
+
+Fokus saja pada console error yang kedua. Ternyata memang pemasangannya gagal pada saat mendapatkan service worker script dengan kode 404. Artinya, berkas tersebut tidak ditemukan oleh aplikasi.
+
+Ingatkah Anda bahwa kita hanya membuat berkas sw.js dan tidak melakukan hal apa pun lagi selain menyiapkan proses instalasinya, misalnya mengimpor ke berkas scripts → index.js. Namun, bukan impor solusinya. Kita perlu mendaftarkan service worker script sebagai entry point kedua dalam webpack supaya mampu diproses menjadi bagian dari aset yang siap dipakai, seperti index.js.
+
+Jadi, silakan buka webpack.common.js dan tambahkan kode bercetak tebal berikut.
+
+webpack.common.js
+const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+ 
+module.exports = {
+  entry: {
+    app: path.resolve(__dirname, 'src/scripts/index.js'),
+    sw: path.resolve(__dirname, 'src/scripts/sw.js'),
+  },
+ 
+  /* ...kode lainnya disembunyikan... */
+ 
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, 'src/index.html'),
+      excludeChunks: ['sw'],
+    }),
+ 
+    /* ...kode lainnya disembunyikan... */
+  ],
+};
+Saat webpack dijalankan dalam mode production, kode di atas akan menyebabkan direktori dist memiliki berkas bernama sw.bundle.js dan itulah yang akan kita gunakan.
+
+
+
+Selain itu, penggunaan HtmlWebpackPlugin akan menyebabkan seluruh entry point dipanggil dalam index.html. Oleh karena itu, kita mengatur agar sw.bundle.js tidak disertakan menggunakan excludeChunks.
+
+Lalu, pada bagian apa sw.bundle.js digunakan? Tentunya pada saat registrasi service worker, ya. Oleh karena itu, mari kita sesuaikan nama berkasnya pada utils → index.js.
+
+utils → index.js
+/* ...kode lainnya disembunyikan... */
+ 
+export async function registerServiceWorker() {
+  /* ...kode lainnya disembunyikan... */
+ 
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.bundle.js');
+    console.log('Service worker telah terpasang', registration);
+  } catch (error) {
+    console.log('Failed to install service worker:', error);
+  }
+}
+Habis itu, mari kita jalankan ulang lagi webpack-nya. Silakan matikan dan nyalakan lagi npm script start-dev, ya. Kini, service worker berhasil dipasang.
+
+
+
+Karena masih tahap pengembangan dan ke depannya kita akan memperbarui server worker script, Anda bisa menandai checkbox “Update on reload”, ya.
+
+
+
+Membuat Sampel Notifikasi
+Sebetulnya, kita membutuhkan peran server supaya pengalaman web push notification menjadi nyata. Sementara ini, kita coba simulasikan dahulu menggunakan Developer Tools.
+
+Pertama, kita perlu siapkan kodenya dahulu. Bukalah berkas sw.js dan tambahkan kode berikut.
+
+sw.js
+self.addEventListener('push', (event) => {
+  console.log('Service worker pushing...');
+ 
+  async function chainPromise() {
+    await self.registration.showNotification('Ada laporan baru untuk Anda!', {
+      body: 'Terjadi kerusakan lampu jalan di Jl. Melati',
+    });
+  }
+ 
+  event.waitUntil(chainPromise());
+});
+Kita akan menjajal dahulu untuk menjalankan event push. Karena umumnya event push dilakukan oleh server, kita akan memanfaatkan Developer Tools.
+
+Bagi pengguna Chrome, ada fitur untuk melakukan simulasi push menggunakan tombol “Push” dalam service worker.
+
+
+
+Silakan klik dan perhatikan yang terjadi dalam console browser.
+
+
+
+Keren. Event push berhasil dibangkitkan! Namun, ternyata ada satu error. Aplikasi tidak memiliki izin untuk menampilkan notifikasi. Sudah jelas apa yang dibutuhkan, bukan?
+
+Kali ini, kita akan coba mengizinkan permission notifikasi melalui Chrome setting. Silakan buka alamat berikut pada Chrome browser Anda.
+
+chrome://settings/content/siteDetails?site=http://localhost:9000
+
+Lalu, pada bagian Permissions, cari “Notifications” dan aturlah menjadi “Allow”.
+
+
+
+Perubahan pengaturan di atas biasanya akan membutuhkan proses reload halaman. Oleh karena itu, klik dahulu tombol “Reload” untuk menerapkannya seperti yang ditunjukkan pada gambar berikut.
+
+
+
+Oke, cukup. Mari kembali ke aplikasi, buka Developer Tools, dan klik tombol “Push” untuk mengecek hasilnya kembali. Notifikasi sudah muncul, lo.
+
+
+
+Lihat! Ada judul serta konten ekstra sesuai dengan yang kita tambahkan pada title (parameter pertama) dan body (parameter kedua) dari method showNotification.
+
+Catatan:
+Tampilan notifikasi setiap sistem operasi berbeda-beda. Kami menggunakan sistem operasi Linux dengan distro MX Linux 23.
+
+Ini hanyalah simulasi. Kita akan segera mengintegrasikan web push notification dengan server.
+
+
+
+Berlangganan Push Message
+Strategi berlangganan ke web push notification tidak akan kita lakukan di awal saat aplikasi dibuka meskipun itu sah-sah saja. Rencananya, kita akan memerlukan sebuah trigger menggunakan tombol dalam bar navigasi.
+
+Elemen tombol beserta wadahnya telah kami siapkan dalam templates.js. Kita tinggal memanfaatkannya saja. Silakan buka app.js dan tambahkan kode bercetak tebal berikut.
+
+import { getActiveRoute } from '../routes/url-parser';
+import {
+  generateAuthenticatedNavigationListTemplate,
+  generateMainNavigationListTemplate,
+  generateSubscribeButtonTemplate,
+  generateUnauthenticatedNavigationListTemplate,
+} from '../templates';
+import {
+  isServiceWorkerAvailable,
+  setupSkipToContent,
+  transitionHelper,
+} from '../utils';
+import { getAccessToken, getLogout } from '../utils/auth';
+import { routes } from '../routes/routes';
+ 
+export default class App {
+  /* ...kode lainnya disembunyikan... */
+ 
+  async #setupPushNotification() {
+    const pushNotificationTools = document.getElementById('push-notification-tools');
+    pushNotificationTools.innerHTML = generateSubscribeButtonTemplate();
+    document.getElementById('subscribe-button').addEventListener('click', () => {
+      // TODO: subscribe to push manager
+    });
+  }
+ 
+  async renderPage() {
+    /* ...kode lainnya disembunyikan... */
+ 
+    transition.ready.catch(console.error);
+    transition.updateCallbackDone.then(() => {
+      scrollTo({ top: 0, behavior: 'instant' });
+      this.#setupNavigationList();
+ 
+      if (isServiceWorkerAvailable()) {
+        this.#setupPushNotification();
+      }
+    });
+  }
+}
+Tombol “Subscribe” seharusnya telah muncul. Tugas berikutnya adalah membuatnya berfungsi secara utuh.
+
+
+
+Agar kode menjadi lebih mudah dipelihara ke depannya, kita akan menyiapkan function khusus untuk melakukan subscribe ke push manager. Untuk itu, kita buat berkas baru bernama notification-helper.js dalam direktori utils dan tambahkan kode-kode berikut.
+
+notification-helper.js
+export function isNotificationAvailable() {
+  return 'Notification' in window;
+}
+ 
+export function isNotificationGranted() {
+  return Notification.permission === 'granted';
+}
+ 
+export async function requestNotificationPermission() {
+  if (!isNotificationAvailable()) {
+    console.error('Notification API unsupported.');
+    return false;
+  }
+ 
+  if (isNotificationGranted()) {
+    return true;
+  }
+ 
+  const status = await Notification.requestPermission();
+ 
+  if (status === 'denied') {
+    alert('Izin notifikasi ditolak.');
+    return false;
+  }
+ 
+  if (status === 'default') {
+    alert('Izin notifikasi ditutup atau diabaikan.');
+    return false;
+  }
+ 
+  return true;
+}
+ 
+export async function getPushSubscription() {
+  const registration = await navigator.serviceWorker.getRegistration();
+  return await registration.pushManager.getSubscription();
+}
+ 
+export async function isCurrentPushSubscriptionAvailable() {
+  return !!(await getPushSubscription());
+}
+ 
+export async function subscribe() {
+  if (!(await requestNotificationPermission())) {
+    return;
+  }
+ 
+  if (await isCurrentPushSubscriptionAvailable()) {
+    alert('Sudah berlangganan push notification.');
+    return;
+  }
+ 
+  console.log('Mulai berlangganan push notification...');
+}
+Ada enam function baru di atas. Tenang! Lebih mudah memahami fungsi masing-masing dengan memahami function subscribe.
+
+Function subscribe akan bertanggung jawab untuk melakukan proses subscribing ke push message melalui push manager. Sebelum melakukan itu, kita perlu memastikan dua hal berikut.
+
+Dukungan dan permission dari Notification API untuk memunculkan notifikasi.
+Memeriksa status langganan saat ini sebelum yang baru diproses agar tidak terjadi duplikasi.
+Untuk poin pertama, kami rasa tidak perlu menjelaskannya dengan terlalu diperinci karena sudah kita pelajari dengan matang sebelumnya.
+
+Untuk poin kedua, kita memeriksa kondisi langganan melalui method getSubscription. Method ini dapat diakses melalui pushManager (properti yang mengembalikan objek PushManager), yang diperoleh dari objek ServiceWorkerRegistration (diperoleh dari getRegistration).
+
+Method getSubscription sebetulnya akan mengembalikan objek PushSubscription. Namun, jika kondisi aplikasi belum pernah berlangganan, ia akan mengembalikan null.
+
+Oke, mari kita eksekusi function subscribe pada event click tombol “Subscribe”. Buka berkas app.js dan tambahkan kode bercetak tebal berikut.
+
+app.js
+/* ...kode lainnya disembunyikan... */
+import { getAccessToken, getLogout } from '../utils/auth';
+import { routes } from '../routes/routes';
+import { subscribe } from '../utils/notification-helper';
+ 
+export default class App {
+  /* ...kode lainnya disembunyikan... */
+ 
+  async #setupPushNotification() {
+    const pushNotificationTools = document.getElementById('push-notification-tools');
+ 
+    pushNotificationTools.innerHTML = generateSubscribeButtonTemplate();
+    document.getElementById('subscribe-button').addEventListener('click', () => {
+      subscribe();
+    });
+  }
+ 
+  /* ...kode lainnya disembunyikan... */
+}
+Mantap! Ingin mencoba klik tombolnya? Silakan! Kira-kira saat ini akan menampilkan popup permintaan izin notifikasi seperti berikut.
+
+
+
+Apabila user memilih Allow, aplikasi harus memproses langganannya, sedangkan proses tidak akan dilanjutkan jika memilih “Block” atau “Tolak”. Jika kondisi aplikasinya sudah “Allow”, pada aplikasi tidak akan muncul apa pun.
+
+Mari kita lanjutkan. Proses langganan tidak hanya melibatkan client saja, tetapi juga server. Oleh karena itu, kita memerlukan akses untuk menyimpan data langganan di sisi server. Anda bisa membuka dan memperhatikan aksesnya (kode) pada berkas data → api.js berikut.
+
+data → api.js
+/* ...kode lainnya disembunyikan... */
+ 
+export async function subscribePushNotification({ endpoint, keys: { p256dh, auth } }) {
+  const accessToken = getAccessToken();
+  const data = JSON.stringify({
+    endpoint,
+    keys: { p256dh, auth },
+  });
+ 
+  const fetchResponse = await fetch(ENDPOINTS.SUBSCRIBE, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: data,
+  });
+  const json = await fetchResponse.json();
+ 
+  return {
+    ...json,
+    ok: fetchResponse.ok,
+  };
+}
+ 
+export async function unsubscribePushNotification({ endpoint }) {
+  const accessToken = getAccessToken();
+  const data = JSON.stringify({ endpoint });
+ 
+  const fetchResponse = await fetch(ENDPOINTS.UNSUBSCRIBE, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: data,
+  });
+  const json = await fetchResponse.json();
+ 
+  return {
+    ...json,
+    ok: fetchResponse.ok,
+  };
+}
+ 
+/* ...kode lainnya disembunyikan... */
+Kode di atas tidak perlu ditambahkan karena sudah ada. Dengan demikian, kita bisa lanjut menyusun kode untuk memproses langganan web push notification pada subscribe berikut.
+
+notification-helper.js
+import { convertBase64ToUint8Array } from './index';
+import { VAPID_PUBLIC_KEY } from '../config';
+ 
+/* ...kode lainnya disembunyikan... */
+ 
+export function generateSubscribeOptions() {
+  return {
+    userVisibleOnly: true,
+    applicationServerKey: convertBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  };
+}
+ 
+export async function subscribe() {
+  /* ...kode lainnya disembunyikan... */
+ 
+  console.log('Mulai berlangganan push notification...');
+ 
+  const failureSubscribeMessage = 'Langganan push notification gagal diaktifkan.';
+  const successSubscribeMessage = 'Langganan push notification berhasil diaktifkan.';
+  let pushSubscription;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    pushSubscription = await registration.pushManager.subscribe(generateSubscribeOptions());
+    const { endpoint, keys } = pushSubscription.toJSON();
+    console.log({ endpoint, keys });
+    alert(successSubscribeMessage);
+  } catch (error) {
+    console.error('subscribe: error:', error);
+    alert(failureSubscribeMessage);
+  }
+}
+Sudah ditambahkan? Sekarang, perhatikan dan pahami dengan saksama kode tambahannya.
+
+Kita memanggil method pushManager.subscribe untuk memproses langganan di sisi browser. Method ini membutuhkan satu parameter berupa objek, tetapi harus berisi dua properti, yaitu userVisibleOnly dan applicationServerKey.
+
+Beberapa browser, salah satunya Chrome mengharuskan properti userVisibileOnly bernilai true sebab berkaitan dengan visibilitas dan mempertahankan keamanan user.
+
+Properti applicationServerKey berguna untuk proses autentikasi client di sisi server. Karena web push notification menggunakan skema VAPID, kita perlu mendapatkan VAPID key yang bersifat publik dari server. Key tersebut bisa kita peroleh dari halaman dokumentasi CityCare API. Namun, key ini perlu dikonversi menjadi objek Uint8Array. Kita sudah menyediakannya dalam utils → index.js.
+
+Mari kita tambahkan VAPID public key dalam config.js seperti berikut.
+
+config.js
+export const ACCESS_TOKEN_KEY = 'accessToken';
+ 
+export const BASE_URL = 'https://citycare-api.dicoding.dev/v1';
+ 
+export const MAP_SERVICE_API_KEY = 'YOUR_API_KEY';
+ 
+export const VAPID_PUBLIC_KEY =
+  'BCCs2eonMI-6H2ctvFaWg-UYdDv387Vno_bzUzALpB442r2lCnsHmtrx8biyPi_E-1fSGABK_Qs_GlvPoJJqxbk';
+Pastikan VAPID key sudah ditambahkan, ya.
+
+Setelah berhasil subscribe di sisi client dan mendapatkan data langganan, kita perlu menyimpannya di sisi server. Kita panggil saja API server yang sudah disiapkan.
+
+Tambahkan kode bercetak tebal berikut.
+
+notification-helper.js
+import { convertBase64ToUint8Array } from './index';
+import { VAPID_PUBLIC_KEY } from '../config';
+import { subscribePushNotification } from '../data/api';
+ 
+/* ...kode lainnya disembunyikan... */
+ 
+export async function subscribe() {
+  /* ...kode lainnya disembunyikan... */
+ 
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    pushSubscription = await registration.pushManager.subscribe(generateSubscribeOptions());
+ 
+    const { endpoint, keys } = pushSubscription.toJSON();
+    const response = await subscribePushNotification({ endpoint, keys });
+    if (!response.ok) {
+      console.error('subscribe: response:', response);
+      alert(failureSubscribeMessage);
+      // Undo subscribe to push notification
+      await pushSubscription.unsubscribe();
+      return;
+    }
+ 
+    alert(successSubscribeMessage);
+  } catch (error) {
+    console.error('subscribe: error:', error);
+    alert(failureSubscribeMessage);
+  }
+}
+Mengirim data ke server hanya membutuhkan endpoint dan keys. Dengan demikian, server dapat mengirimkan push message ke semua client atau salah satunya secara tepat sasaran.
+
+Sebelum melihat hasilnya, ada satu hal lagi yang ingin dibahas. Jika berpikir kritis, proses penyimpanan data langganan ke server mungkin saja gagal, kan? Tentu itu di luar kendali developer web. Padahal, kita sudah melakukan langganan di sisi client (push manager). Pada saat inilah fungsi dari catch block akan kita manfaatkan untuk membatalkan langganan di sisi client.
+
+Tambahkan kode bercetak tebal berikut.
+
+notification-helper.js
+/* ...kode lainnya disembunyikan... */
+ 
+export async function subscribe() {
+  /* ...kode lainnya disembunyikan... */
+ 
+  try {
+    /* ...kode lainnya disembunyikan... */
+ 
+    if (!response.ok) {
+      console.error('subscribe: response:', response);
+      alert(failureSubscribeMessage);
+ 
+      // Undo subscribe to push notification
+      await pushSubscription.unsubscribe();
+ 
+      return;
+    }
+ 
+    alert(successSubscribeMessage);
+  } catch (error) {
+    console.error('subscribe: error:', error);
+    alert(failureSubscribeMessage);
+ 
+    // Undo subscribe to push notification
+    await pushSubscription.unsubscribe();
+  }
+}
+Oke, kita sudah selesai dalam bagian ini dan tinggal dicoba aplikasinya. Klik tombol “Subscribe” berwarna jingga dan perhatikan hasilnya.
+
+Tidak ada hasil apa pun, ya? Memang berlangganan web push notification tidak menimbulkan hal apa pun pada tampilan user, kecuali ada kiriman push message dari server yang akan menampilkan notifikasi. Namun, kita bisa melihat proses pengiriman data langganan melalui tab Network pada Developer Tools seperti gambar berikut.
+
+
+
+Dalam kondisi ini, kita bisa memanfaatkan status langganan dengan mengubah tombol dari “Subscribe” menjadi “Unsubscribe”. Artinya, selain memberi cara berlangganan, kita akan menyajikan tombol untuk menghentikan langganan tersebut.
+
+Bukalah berkas app.js dan tambahkan kode bercetak tebal berikut.
+
+app.js
+import { getActiveRoute } from '../routes/url-parser';
+import {
+  generateAuthenticatedNavigationListTemplate,
+  generateMainNavigationListTemplate,
+  generateSubscribeButtonTemplate,
+  generateUnauthenticatedNavigationListTemplate,
+  generateUnsubscribeButtonTemplate,
+} from '../templates';
+import { isServiceWorkerAvailable, setupSkipToContent, transitionHelper } from '../utils';
+import { getAccessToken, getLogout } from '../utils/auth';
+import { routes } from '../routes/routes';
+import { isCurrentPushSubscriptionAvailable, subscribe } from '../utils/notification-helper';
+ 
+export default class App {
+  /* ...kode lainnya disembunyikan... */
+ 
+  async #setupPushNotification() {
+    const pushNotificationTools = document.getElementById('push-notification-tools');
+    const isSubscribed = await isCurrentPushSubscriptionAvailable();
+    if (isSubscribed) {
+      pushNotificationTools.innerHTML = generateUnsubscribeButtonTemplate();
+      return;
+    }
+ 
+    pushNotificationTools.innerHTML = generateSubscribeButtonTemplate();
+    document.getElementById('subscribe-button').addEventListener('click', () => {
+      subscribe().finally(() => {
+        this.#setupPushNotification();
+      });
+    });
+  }
+ 
+  /* ...kode lainnya disembunyikan... */
+}
+Nice! Sekarang buka aplikasi dan refresh halamannya. Harusnya, caption tombol sudah berubah.
+
+
+
+
+Memicu Push Message
+Web push notification dan server worker sudah siap. Selanjutnya, mari kita coba mengirim push message pada client yang berlangganan dengan cara memicunya.
+
+Kita mulai dengan tombol bernama “Try Notify Me”. Tombol itu ada pada halaman rincian laporan, tetapi tombolnya belum fungsional.
+
+
+
+Rencananya, hasil dari klik tombol “Try Notify Me” akan memunculkan notifikasi terkait laporan yang sedang dibuka. Proses ini melibatkan push message yang akan dikirimkan ke perangkat kita oleh server.
+
+Silakan buka berkas report-detail-presenter.js dan tambahkan kode bercetak tebal berikut.
+
+report-detail-presenter.js
+import { reportMapper } from '../../data/api-mapper';
+ 
+export default class ReportDetailPresenter {
+  /* ...kode lainnya disembunyikan... */
+ 
+  async postNewComment({ body }) {
+    /* ...kode lainnya disembunyikan... */
+  }
+ 
+  async notifyMe() {
+    try {
+      const response = await this.#apiModel.sendReportToMeViaNotification(this.#reportId);
+      if (!response.ok) {
+        console.error('notifyMe: response:', response);
+        return;
+      }
+      console.log('notifyMe:', response.message);
+    } catch (error) {
+      console.error('notifyMe: error:', error);
+    }
+  }
+ 
+  /* ...kode lainnya disembunyikan... */
+}
+Kemudian, panggil method notifyMe pada class ReportDetailPage seperti berikut.
+
+report-detail-page.js
+/* ...kode lainnya disembunyikan... */
+ 
+export default class ReportDetailPage {
+  /* ...kode lainnya disembunyikan... */
+ 
+  addNotifyMeEventListener() {
+    document.getElementById('report-detail-notify-me').addEventListener('click', () => {
+      this.#presenter.notifyMe();
+    });
+  }
+ 
+  /* ...kode lainnya disembunyikan... */
+}
+Sudah selesai ditambahkan? Sebelum dicoba, mari kita ubah sejenak isi sw.js agar seperti kode bercetak tebal berikut.
+
+sw.js
+EventListener('push', (event) => {
+  console.log('Service worker pushing...');
+ 
+  async function chainPromise() {
+    const data = await event.data.json();
+    await self.registration.showNotification(data.title, {
+      body: data.options.body,
+    });
+  }
+ 
+  event.waitUntil(chainPromise());
+});
+Sip! Simpan perubahannya dan mari kita coba klik tombolnya.
+
+
+
+Notifikasi sudah muncul. Keren!
+
+Mungkin Anda bertanya-tanya, apa fungsi dari kode event.data.json()?
+
+Push notification sebetulnya mirip dengan REST API, dalam push message, ada data yang dikirimkan oleh server. Kebetulan, datanya berformat JSON sehingga kita mampu mengonversinya dengan json(). Dari mana kita tahu? Itu terdokumentasi dalam halaman dokumentasi API.
+
+Beginilah pengalaman simpel dari web push notification. Namun, kita tidak akan menerapkan sesederhana ini saja. Ada dua bagian aplikasi utama yang akan kita implementasikan trigger-nya.
+
+Mengirimkan ke seluruh pengguna saat membuat laporan baru.
+Mengirimkan kepada pelapor saat komentar baru ditambahkan.
+Lo, bukannya ini adalah pekerjaan server? Memang benar dan ini mirip dengan tombol try notify me. Bisa saja server yang menyelipkan kode trigger-nya bersamaan saat pembuatan laporan baru. Namun, server yang kita gunakan telah menyediakan akses kepada client untuk men-trigger pengiriman ini melalui REST API. Anda bisa memeriksanya dalam bagian Push Notification pada halaman dokumentasi.
+
+Mari kita mulai dengan yang pertama.
+
+Apakah Anda masih ingat lokasi kode yang memproses pembuatan laporan baru? Letaknya pada class NewPresenter, lebih tepatnya method postNewReport. Method tersebut hanya fokus pada pembuatan data baru. Rencananya, kita akan men-trigger pengiriman push message tepat setelah laporan berhasil ditambahkan.
+
+Silakan buka berkas new-presenter.js dan tambahkan kode bercetak tebal berikut.
+
+Tab 1
+export default class NewPresenter {
+  /* ...kode lainnya disembunyikan... */
+ 
+  async postNewReport({ title, damageLevel, description, evidenceImages, latitude, longitude }) {
+    this.#view.showSubmitLoadingButton();
+ 
+    try {
+      /* ...kode lainnya disembunyikan... */
+ 
+      // No need to wait response
+      this.#notifyToAllUser(response.data.id);
+ 
+      this.#view.storeSuccessfully(response.message, response.data);
+    } catch (error) {
+      console.error('postNewReport: error:', error);
+      this.#view.storeFailed(error.message);
+    } finally {
+      this.#view.hideSubmitLoadingButton();
+    }
+  }
+ 
+  async #notifyToAllUser(reportId) {
+    try {
+      const response = await this.#model.sendReportToAllUserViaNotification(reportId);
+      if (!response.ok) {
+        console.error('#notifyToAllUser: response:', response);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('#notifyToAllUser: error:', error);
+      return false;
+    }
+  }
+}
+Sudah selesai. Lalu, bagaimana cara kita membuktikan ini bekerja?
+
+Silakan Anda buat laporan baru dengan mengunjungi halaman “Buat Laporan” dan data-data yang diinginkan. Tidak perlu pakai data kerusakan asli/nyata karena ini hanya percobaan saja.
+
+Jika sudah, klik tombol submit dan perhatikan hasilnya.
+
+
+
+Notifikasi sudah muncul! Tidak hanya kita yang mendapat notifikasi, seluruh pengguna terdaftar dan berlangganan push notification akan mendapatkan notifikasi ini.
+
+Trigger bagian pertama sudah selesai, lanjut ke bagian berikutnya.
+
+Bagian kedua berada pada cakupan pembuatan komentar laporan baru. Ini letaknya pada class ReportDetailPresenter. Mari kita tambahkan trigger-nya.
+
+Buka berkas report-detail-presenter.js dan tambahkan kode bercetak tebal berikut.
+
+report-detail-presenter.js
+import { reportMapper } from '../../data/api-mapper';
+ 
+export default class ReportDetailPresenter {
+  /* ...kode lainnya disembunyikan... */
+ 
+  async postNewComment({ body }) {
+    this.#view.showSubmitLoadingButton();
+    try {
+      const response = await this.#apiModel.storeNewCommentByReportId(this.#reportId, { body });
+ 
+      if (!response.ok) {
+        console.error('postNewComment: response:', response);
+        this.#view.postNewCommentFailed(response.message);
+        return;
+      }
+ 
+      // No need to wait response
+      this.notifyReportOwner(response.data.id);
+ 
+      this.#view.postNewCommentSuccessfully(response.message, response.data);
+    } catch (error) {
+      console.error('postNewComment: error:', error);
+      this.#view.postNewCommentFailed(error.message);
+    } finally {
+      this.#view.hideSubmitLoadingButton();
+    }
+  }
+ 
+  async notifyReportOwner(commentId) {
+    try {
+      const response = await this.#apiModel.sendCommentToReportOwnerViaNotification(
+        this.#reportId,
+        commentId,
+      );
+      if (!response.ok) {
+        console.error('notifyReportOwner: response:', response);
+        return;
+      }
+      console.log('notifyReportOwner:', response.message);
+    } catch (error) {
+      console.error('notifyReportOwner: error:', error);
+    }
+  }
+ 
+  /* ...kode lainnya disembunyikan... */
+}
+Simpan perubahannya dan cobalah membuat komentar baru pada laporan yang baru saja kita buat.
+
+
+
+Awesome! Trigger push message untuk komentar sudah berhasil ditambahkan.
+
+
+
+Menghadirkan Putus Langganan
+Selain menyediakan akses berlangganan, alangkah baiknya kita hadirkan juga tombol atau sesuatu untuk memutus langganan. Ini akan memberikan keleluasaan pada user yang tidak ingin lagi mendapatkan informasi terbaru.
+
+Sebetulnya, kita sudah menyediakan tombol untuk ini. Tinggal kita lengkapi saja fungsionalitasnya.
+
+Silakan buka berkas notification-helper.js dan tambahkan kode bercetak tebal berikut.
+
+notification-helper.js
+import { convertBase64ToUint8Array } from './index';
+import { VAPID_PUBLIC_KEY } from '../config';
+import { subscribePushNotification, unsubscribePushNotification } from '../data/api';
+ 
+/* ...kode lainnya disembunyikan... */
+ 
+export async function unsubscribe() {
+  const failureUnsubscribeMessage = 'Langganan push notification gagal dinonaktifkan.';
+  const successUnsubscribeMessage = 'Langganan push notification berhasil dinonaktifkan.';
+  try {
+    const pushSubscription = await getPushSubscription();
+    if (!pushSubscription) {
+      alert('Tidak bisa memutus langganan push notification karena belum berlangganan sebelumnya.');
+      return;
+    }
+    const { endpoint, keys } = pushSubscription.toJSON();
+    const response = await unsubscribePushNotification({ endpoint });
+    if (!response.ok) {
+      alert(failureUnsubscribeMessage);
+      console.error('unsubscribe: response:', response);
+      return;
+    }
+    const unsubscribed = await pushSubscription.unsubscribe();
+    if (!unsubscribed) {
+      alert(failureUnsubscribeMessage);
+      await subscribePushNotification({ endpoint, keys });
+      return;
+    }
+    alert(successUnsubscribeMessage);
+  } catch (error) {
+    alert(failureUnsubscribeMessage);
+    console.error('unsubscribe: error:', error);
+  }
+}
+Untuk melakukan proses memutus langganan push notification, kita perlu mendapatkan objek PushSubscription dahulu, lalu bisa memanggil method unsubscribe. Tidak memerlukan parameter apa pun, dia akan mengembalikan nilai boolean untuk menandakan hasilnya.
+
+Mari kita eksekusi function baru. Buka berkas app.js dan tambahkan kode bercetak tebal berikut.
+
+app.js
+/* ...kode impor lainnya disembunyikan... */
+ 
+import {
+  isCurrentPushSubscriptionAvailable,
+  subscribe,
+  unsubscribe,
+} from '../utils/notification-helper';
+ 
+export default class App {
+  /* ...kode lainnya disembunyikan... */
+ 
+  async #setupPushNotification() {
+    const pushNotificationTools = document.getElementById('push-notification-tools');
+    const isSubscribed = await isCurrentPushSubscriptionAvailable();
+ 
+    if (isSubscribed) {
+      pushNotificationTools.innerHTML = generateUnsubscribeButtonTemplate();
+      document.getElementById('unsubscribe-button').addEventListener('click', () => {
+        unsubscribe().finally(() => {
+          this.#setupPushNotification();
+        });
+      });
+ 
+      return;
+    }
+ 
+    pushNotificationTools.innerHTML = generateSubscribeButtonTemplate();
+    document.getElementById('subscribe-button').addEventListener('click', () => {
+      subscribe().finally(() => {
+        this.#setupPushNotification();
+      });
+    });
+  }
+ 
+  /* ...kode lainnya disembunyikan... */
+}
+Sudah? Simpanlah dan mari kita coba klik tombolnya.
+
+
+
+Proses unsubscribe berhasil, server sudah menghapus data langganannya, dan tombol sudah berubah menjadi “Subscribe” kembali. Mantap!

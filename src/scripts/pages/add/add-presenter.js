@@ -1,5 +1,4 @@
 import { addStory } from '../../data/api';
-import { showLocalNotification, requestNotificationPermission, subscribeUserToPush } from '../../utils/push-notification';
 import { saveStory } from '../../utils/idb-helper';
 
 class AddPresenter {
@@ -20,31 +19,57 @@ class AddPresenter {
         this.showToast(result.message || 'Gagal menambah kuliner.');
       } else {
         this.showToast('Berhasil menambah kuliner!');
-        // Push notification
-        if (await requestNotificationPermission()) {
-          await subscribeUserToPush();
-          try {
-            await showLocalNotification('Kuliner Baru Ditambahkan', {
-              body: `${name} berhasil ditambahkan!`,
-              icon: '/images/logo.png',
+        // Push notification khusus kuliner
+        try {
+          if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.ready;
+            await registration.showNotification('Ada laporan baru untuk Anda!', {
+              body: `Resto ${name} sudah buka kembali.`,
+              icon: '/starter-project-with-webpack/images/logo.png',
+              badge: '/starter-project-with-webpack/images/logo.png',
+              actions: [
+                { action: 'activate', title: 'Activate' },
+                { action: 'settings', title: 'Settings' }
+              ]
             });
-          } catch (err) {
-            // Fallback: gunakan Notification API langsung jika gagal
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('Kuliner Baru Ditambahkan', {
-                body: `${name} berhasil ditambahkan!`,
-                icon: '/images/logo.png',
-              });
-            }
-            // Log error
-            console.error('Gagal menampilkan notifikasi:', err);
+          } else if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Ada laporan baru untuk Anda!', {
+              body: `Resto ${name} sudah buka kembali.`,
+              icon: '/starter-project-with-webpack/images/logo.png',
+              badge: '/starter-project-with-webpack/images/logo.png',
+            });
           }
+        } catch (err) {
+          console.error('Gagal menampilkan notifikasi:', err);
         }
         setTimeout(() => { this.redirectHome(); }, 1200);
       }
     } catch (err) {
       this.showToast('Terjadi kesalahan jaringan. Data disimpan secara offline.');
       await saveStory({ id: Date.now(), name, description, photoUrl: photo, lat, lon: lng });
+      // Push notification juga untuk mode offline
+      try {
+        if ('serviceWorker' in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification('Ada info baru untuk Anda!', {
+            body: `Resto ${name} sudah buka kembali.`,
+            icon: '/starter-project-with-webpack/images/logo.png',
+            badge: '/starter-project-with-webpack/images/logo.png',
+            actions: [
+              { action: 'lihat', title: 'Lihat' },
+              { action: 'tutup', title: 'Tutup' }
+            ]
+          });
+        } else if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Ada info baru untuk Anda!', {
+            body: `Resto ${name} sudah buka kembali.`,
+            icon: '/starter-project-with-webpack/images/logo.png',
+            badge: '/starter-project-with-webpack/images/logo.png',
+          });
+        }
+      } catch (err) {
+        console.error('Gagal menampilkan notifikasi:', err);
+      }
     }
   }
 }

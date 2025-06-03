@@ -1,5 +1,5 @@
 import { getStories } from '../../data/api';
-import { saveStories, getAllStories } from '../../utils/idb-helper';
+import { saveStory, getAllStories, deleteStory } from '../../utils/idb-helper';
 
 class HomePresenter {
   constructor(view) {
@@ -25,8 +25,7 @@ class HomePresenter {
         return;
       }
       this.view.showStories(data.listStory);
-      // Simpan ke IndexedDB
-      await saveStories(data.listStory);
+      // Hapus: Simpan ke IndexedDB otomatis
     } catch (err) {
       // Fallback ke offline data
       const offlineStories = await getAllStories();

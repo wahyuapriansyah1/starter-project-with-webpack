@@ -18,5 +18,31 @@
       "sizes": "512x512",
       "type": "image/png"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Favorit Saya",
+      "short_name": "Favorit",
+      "description": "Lihat story favorit Anda",
+      "url": "/starter-project-with-webpack/#/favorites",
+      "icons": [
+        {
+          "src": "/starter-project-with-webpack/images/logo.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Tambah Cerita",
+      "short_name": "Tambah",
+      "description": "Bagikan cerita kuliner baru",
+      "url": "/starter-project-with-webpack/#/add",
+      "icons": [
+        {
+          "src": "/starter-project-with-webpack/images/logo.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }
